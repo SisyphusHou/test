@@ -1,0 +1,330 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  background: #1a1a2e;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  padding-top: 20px;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Top row: mode + difficulty ── */
+.controls-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.segmented-control {
+  display: flex;
+  gap: 0;
+  background: #16213e;
+  border-radius: 10px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.seg-btn {
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #888;
+  background: transparent;
+  transition: all 0.2s;
+  outline: none;
+  white-space: nowrap;
+}
+
+.seg-btn.active {
+  background: rgba(255,255,255,0.10);
+  color: #e0e0e0;
+}
+
+.seg-btn:hover:not(.active) {
+  color: #bbb;
+}
+
+/* ── Info panel ── */
+.info-panel {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: #16213e;
+  border-radius: 12px;
+  padding: 14px 28px;
+  border: 1px solid rgba(255,255,255,0.08);
+  flex-wrap: wrap;
+}
+
+.turn-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e0e0e0;
+  font-size: 15px;
+  font-weight: 500;
+  min-width: 130px;
+}
+
+.turn-stone {
+  width: 28px; height: 28px;
+  border-radius: 50%; flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.turn-stone.black-stone {
+  background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+}
+
+.turn-stone.white-stone {
+  background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+}
+
+.thinking-pulse {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.score {
+  display: flex; gap: 18px;
+}
+
+.score-item {
+  display: flex; align-items: center; gap: 6px;
+  color: #a0a0b0; font-size: 13px; font-weight: 500;
+}
+
+.score-dot {
+  width: 14px; height: 14px;
+  border-radius: 50%; flex-shrink: 0;
+}
+
+.score-dot.black-dot {
+  background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+}
+
+.score-dot.white-dot {
+  background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+}
+
+.score-value { color: #e0e0e0; font-weight: 600; margin-left: 2px; }
+
+.btn-group { display: flex; gap: 8px; }
+
+.btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 7px 14px;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 500;
+  color: #c0c0d0;
+  background: rgba(255,255,255,0.05);
+  transition: all 0.15s; outline: none;
+}
+
+.btn:hover {
+  background: rgba(255,255,255,0.10);
+  border-color: rgba(255,255,255,0.20);
+  color: #e0e0e0;
+}
+
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:disabled:hover { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); color: #c0c0d0; }
+
+.btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ── Game layout: board + history panel ── */
+.game-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.board-section {
+  position: relative;
+}
+
+.board-wrapper {
+  position: relative; border-radius: 8px; overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+
+canvas {
+  display: block;
+  cursor: pointer;
+  image-rendering: auto;
+}
+canvas.game-over { cursor: default; }
+canvas.waiting { cursor: wait; }
+
+/* ── Win / Draw overlay ── */
+.win-overlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.win-overlay.visible { opacity: 1; pointer-events: auto; }
+
+.win-card {
+  background: #1e1e3a;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 16px; padding: 32px 40px;
+  text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+}
+
+.win-text { font-size: 22px; font-weight: 600; color: #e0e0e0; }
+.win-stone { width: 44px; height: 44px; border-radius: 50%; }
+
+.win-stone.draw-stone {
+  background: conic-gradient(#333 0deg 180deg, #ddd 180deg 360deg);
+}
+
+.win-stone.black-stone {
+  background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+}
+
+.win-stone.white-stone {
+  background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+}
+
+.btn-primary {
+  padding: 10px 28px; font-size: 15px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.20);
+  border-radius: 10px; color: #e0e0e0;
+  cursor: pointer; font-weight: 600;
+  transition: all 0.15s; outline: none;
+}
+
+.btn-primary:hover {
+  background: rgba(255,255,255,0.16);
+  border-color: rgba(255,255,255,0.30);
+}
+.btn-primary:active { transform: scale(0.97); }
+
+#difficultyToggle.hidden { display: none; }
+
+/* ── Move history panel ── */
+.history-panel {
+  background: #16213e;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  padding: 14px 16px;
+  width: 160px;
+  max-height: 568px;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-title {
+  color: #e0e0e0;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  flex-shrink: 0;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.history-item {
+  color: #a0a0b0;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-item.current {
+  background: rgba(255,255,255,0.06);
+}
+
+.history-num {
+  color: #666;
+  min-width: 20px;
+  flex-shrink: 0;
+}
+
+.history-stone-sm {
+  width: 12px; height: 12px;
+  border-radius: 50%; flex-shrink: 0;
+}
+
+.history-stone-sm.black-sm {
+  background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+}
+
+.history-stone-sm.white-sm {
+  background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+}
+
+.history-pos {
+  color: #c0c0d0;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 850px) {
+  .game-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .history-panel {
+    width: 100%;
+    max-width: 568px;
+    max-height: 180px;
+    flex-shrink: 0;
+  }
+
+  .history-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .history-item {
+    font-size: 11px;
+    padding: 2px 4px;
+  }
+}
+
+@media (max-width: 640px) {
+  .controls-row { flex-direction: column; gap: 8px; }
+  .info-panel { flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 18px; }
+  .seg-btn { padding: 7px 14px; font-size: 12px; }
+}
