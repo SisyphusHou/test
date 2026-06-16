@@ -22,11 +22,17 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
   }
 
-  /* ── Mode toggle ── */
-  .mode-toggle {
+  /* ── Top row: mode + difficulty ── */
+  .controls-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .segmented-control {
     display: flex;
     gap: 0;
     background: #16213e;
@@ -35,12 +41,12 @@
     border: 1px solid rgba(255,255,255,0.08);
   }
 
-  .mode-btn {
-    padding: 8px 22px;
+  .seg-btn {
+    padding: 8px 18px;
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #888;
     background: transparent;
@@ -49,12 +55,12 @@
     white-space: nowrap;
   }
 
-  .mode-btn.active {
+  .seg-btn.active {
     background: rgba(255,255,255,0.10);
     color: #e0e0e0;
   }
 
-  .mode-btn:hover:not(.active) {
+  .seg-btn:hover:not(.active) {
     color: #bbb;
   }
 
@@ -67,6 +73,7 @@
     border-radius: 12px;
     padding: 14px 28px;
     border: 1px solid rgba(255,255,255,0.08);
+    flex-wrap: wrap;
   }
 
   .turn-indicator {
@@ -196,13 +203,26 @@
     border-color: rgba(255,255,255,0.30);
   }
   .btn-primary:active { transform: scale(0.97); }
+
+  @media (max-width: 640px) {
+    .controls-row { flex-direction: column; gap: 8px; }
+    .info-panel { flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 18px; }
+    .seg-btn { padding: 7px 14px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>
 <div class="game-container">
-  <div class="mode-toggle">
-    <button class="mode-btn active" data-mode="pvp">人人对战</button>
-    <button class="mode-btn" data-mode="pvc">人机对战</button>
+  <div class="controls-row">
+    <div class="segmented-control" id="modeToggle">
+      <button class="seg-btn active" data-mode="pvp">人人对战</button>
+      <button class="seg-btn" data-mode="pvc">人机对战</button>
+    </div>
+    <div class="segmented-control" id="difficultyToggle">
+      <button class="seg-btn" data-diff="easy">简单</button>
+      <button class="seg-btn active" data-diff="normal">一般</button>
+      <button class="seg-btn" data-diff="hard">困难</button>
+    </div>
   </div>
 
   <div class="info-panel">
@@ -256,11 +276,17 @@
   const STONE_RADIUS = CELL_SIZE * 0.44;
   const CANVAS_SIZE = MARGIN * 2 + CELL_SIZE * (BOARD_SIZE - 1);
 
-  // AI config
-  const AI_PLAYER = 2;  // AI plays as white
+  const AI_PLAYER = 2;
   const HUMAN_PLAYER = 1;
-  const MAX_DEPTH = 4;
-  const SEARCH_RADIUS = 2;
+
+  // Difficulty config: { depth, radius, topCandidates, deepCandidates, randomness }
+  const DIFFICULTY = {
+    easy:   { depth: 2, radius: 1, topCandidates: 10, deepCandidates: 6,  randomness: true },
+    normal: { depth: 4, radius: 2, topCandidates: 20, deepCandidates: 12, randomness: false },
+    hard:   { depth: 6, radius: 2, topCandidates: 30, deepCandidates: 15, randomness: false }
+  };
+
+  var aiConfig = DIFFICULTY.normal;
 
   const canvas = document.getElementById('board');
   const ctx = canvas.getContext('2d');
@@ -284,10 +310,10 @@
   let winLine = null;
   let wins = { 1: 0, 2: 0 };
   let hoverPos = null;
-  let gameMode = 'pvp'; // 'pvp' | 'pvc'
+  let gameMode = 'pvp';
   let aiThinking = false;
+  let difficulty = 'normal';
 
-  // ── Direction helpers ──
   const DIRECTIONS = [[0, 1], [1, 0], [1, 1], [1, -1]];
 
   function initBoard() {
@@ -326,10 +352,21 @@
 
   function setMode(mode) {
     gameMode = mode;
-    document.querySelectorAll('.mode-btn').forEach(function(b) {
-      b.classList.toggle('active', b.dataset.mode === mode);
-    });
+    var btns = document.querySelectorAll('#modeToggle .seg-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].dataset.mode === mode);
+    }
     initBoard();
+  }
+
+  function setDifficulty(diff) {
+    difficulty = diff;
+    aiConfig = DIFFICULTY[diff];
+    var btns = document.querySelectorAll('#difficultyToggle .seg-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].dataset.diff === diff);
+    }
+    if (gameMode === 'pvc') initBoard();
   }
 
   // ── Drawing ──
@@ -357,7 +394,6 @@
       ctx.stroke();
     }
 
-    // Star points
     var stars = [[3,3],[3,7],[3,11],[7,3],[7,7],[7,11],[11,3],[11,7],[11,11]];
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     for (var s of stars) {
@@ -366,14 +402,10 @@
       ctx.fill();
     }
 
-    // Stones
-    for (let r = 0; r < BOARD_SIZE; r++) {
-      for (let c = 0; c < BOARD_SIZE; c++) {
+    for (let r = 0; r < BOARD_SIZE; r++)
+      for (let c = 0; c < BOARD_SIZE; c++)
         if (board[r][c] !== 0) drawStone(r, c, board[r][c]);
-      }
-    }
 
-    // Win highlight
     if (winLine) {
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
       ctx.lineWidth = 3;
@@ -384,7 +416,6 @@
       }
     }
 
-    // Last move
     if (moveHistory.length > 0 && !aiThinking) {
       var last = moveHistory[moveHistory.length - 1];
       ctx.fillStyle = '#ff4d4d';
@@ -393,10 +424,8 @@
       ctx.fill();
     }
 
-    // Hover
     if (hoverPos && !gameOver && !aiThinking && board[hoverPos.row][hoverPos.col] === 0) {
-      var hx = MARGIN + hoverPos.col * CELL_SIZE;
-      var hy = MARGIN + hoverPos.row * CELL_SIZE;
+      var hx = MARGIN + hoverPos.col * CELL_SIZE, hy = MARGIN + hoverPos.row * CELL_SIZE;
       ctx.fillStyle = currentPlayer === 1 ? 'rgba(0,0,0,0.25)' : 'rgba(200,200,200,0.40)';
       ctx.beginPath();
       ctx.arc(hx, hy, STONE_RADIUS, 0, Math.PI * 2);
@@ -410,15 +439,15 @@
     ctx.shadowColor = 'rgba(0,0,0,0.35)';
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 1.5; ctx.shadowOffsetY = 1.5;
+    var g;
     if (player === 1) {
-      var g = ctx.createRadialGradient(x - r*0.3, y - r*0.35, r*0.1, x, y, r);
+      g = ctx.createRadialGradient(x - r*0.3, y - r*0.35, r*0.1, x, y, r);
       g.addColorStop(0, '#555'); g.addColorStop(0.6, '#1a1a1a'); g.addColorStop(1, '#000');
-      ctx.fillStyle = g;
     } else {
-      var g = ctx.createRadialGradient(x - r*0.3, y - r*0.35, r*0.1, x, y, r);
+      g = ctx.createRadialGradient(x - r*0.3, y - r*0.35, r*0.1, x, y, r);
       g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#e8e8e8'); g.addColorStop(1, '#bbb');
-      ctx.fillStyle = g;
     }
+    ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.fill();
@@ -437,7 +466,6 @@
     return { row, col };
   }
 
-  // ── Win check ──
   function checkWin(row, col, player) {
     for (var d of DIRECTIONS) {
       var dr = d[0], dc = d[1];
@@ -461,7 +489,6 @@
     return moveHistory.length >= BOARD_SIZE * BOARD_SIZE;
   }
 
-  // ── Place stone ──
   function placeStone(row, col) {
     if (gameOver || aiThinking || board[row][col] !== 0) return;
 
@@ -489,7 +516,6 @@
     updateUI();
     drawBoard();
 
-    // Trigger AI if in computer mode and it's AI's turn
     if (gameMode === 'pvc' && currentPlayer === AI_PLAYER && !gameOver) {
       scheduleAIMove();
     }
@@ -542,7 +568,7 @@
       btnReset.disabled = false;
       updateUI();
       drawBoard();
-    }, 250);
+    }, 200);
   }
 
   // ── AI: Evaluation ──
@@ -550,27 +576,21 @@
 
   function evaluateBoard() {
     var score = 0;
-
-    // Scan all 5-in-a-row windows
-    for (var dir of DIRECTIONS) {
-      var dr = dir[0], dc = dir[1];
+    for (var d of DIRECTIONS) {
+      var dr = d[0], dc = d[1];
       for (var r = 0; r < BOARD_SIZE; r++) {
         for (var c = 0; c < BOARD_SIZE; c++) {
           var r4 = r + dr*4, c4 = c + dc*4;
           if (r4 < 0 || r4 >= BOARD_SIZE || c4 < 0 || c4 >= BOARD_SIZE) continue;
-
-          var ai_cnt = 0, hum_cnt = 0, empty = 0;
+          var ai_cnt = 0, hum_cnt = 0;
           for (var i = 0; i < 5; i++) {
             var cell = board[r + dr*i][c + dc*i];
             if (cell === AI_PLAYER) ai_cnt++;
             else if (cell === HUMAN_PLAYER) hum_cnt++;
-            else empty++;
           }
-
-          // Mixed: dead window
           if (ai_cnt > 0 && hum_cnt > 0) continue;
           if (ai_cnt > 0) score += SCORE_TABLE[ai_cnt] || 0;
-          if (hum_cnt > 0) score -= (SCORE_TABLE[hum_cnt] || 0) * 1.05; // slight defense bias
+          if (hum_cnt > 0) score -= (SCORE_TABLE[hum_cnt] || 0) * 1.05;
         }
       }
     }
@@ -579,81 +599,60 @@
 
   // ── AI: Candidate moves ──
   function getCandidateMoves() {
-    var candidates = [];
-    var hasStone = moveHistory.length > 0;
+    if (moveHistory.length === 0) return [{ row: 7, col: 7 }];
 
-    if (!hasStone) {
-      return [{ row: 7, col: 7 }];
-    }
-
-    // Collect empty cells near stones
     var near = {};
+    var radius = aiConfig.radius;
     for (var r = 0; r < BOARD_SIZE; r++) {
       for (var c = 0; c < BOARD_SIZE; c++) {
         if (board[r][c] === 0) continue;
-        for (var dr = -SEARCH_RADIUS; dr <= SEARCH_RADIUS; dr++) {
-          for (var dc = -SEARCH_RADIUS; dc <= SEARCH_RADIUS; dc++) {
-            var nr = r + dr, nc = c + dc;
+        for (var dr = -radius; dr <= radius; dr++) {
+          for (var dc = -radius; dc <= radius; dc++) {
             if (dr === 0 && dc === 0) continue;
+            var nr = r + dr, nc = c + dc;
             if (nr >= 0 && nr < BOARD_SIZE && nc >= 0 && nc < BOARD_SIZE && board[nr][nc] === 0) {
-              var key = nr * BOARD_SIZE + nc;
-              near[key] = { row: nr, col: nc };
+              near[nr * BOARD_SIZE + nc] = { row: nr, col: nc };
             }
           }
         }
       }
     }
-
-    candidates = Object.values(near);
-    if (candidates.length === 0) {
-      candidates.push({ row: 7, col: 7 });
-    }
+    var candidates = Object.values(near);
+    if (candidates.length === 0) candidates.push({ row: 7, col: 7 });
     return candidates;
   }
 
-  // ── AI: Minimax with alpha-beta ──
+  // ── AI: Minimax ──
   function minimax(depth, alpha, beta, isMaximizing) {
-    // Check for terminal state quickly
-    if (depth === 0) {
-      return evaluateBoard();
-    }
+    if (depth === 0) return evaluateBoard();
 
     var moves = getCandidateMoves();
     if (moves.length === 0) return 0;
 
-    // Move ordering: score each move first for better pruning
+    // Move ordering
     var scored = [];
     for (var m of moves) {
-      var r = m.row, c = m.col;
-      board[r][c] = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
+      board[m.row][m.col] = isMaximizing ? AI_PLAYER : HUMAN_PLAYER;
       var s = evaluateBoard();
-      board[r][c] = 0;
-      scored.push({ row: r, col: c, score: s });
+      board[m.row][m.col] = 0;
+      scored.push({ row: m.row, col: m.col, score: s });
     }
 
-    if (isMaximizing) {
-      scored.sort(function(a, b) { return b.score - a.score; }); // best first
-    } else {
-      scored.sort(function(a, b) { return a.score - b.score; }); // worst (for AI) first
-    }
+    if (isMaximizing) scored.sort(function(a, b) { return b.score - a.score; });
+    else scored.sort(function(a, b) { return a.score - b.score; });
 
-    // Limit branching at depth > 2
-    var maxBranches = depth === MAX_DEPTH ? 25 : (depth >= 3 ? 15 : 12);
-    if (scored.length > maxBranches) {
-      scored = scored.slice(0, maxBranches);
-    }
+    // Prune candidates based on difficulty
+    var maxBranches = depth === aiConfig.depth ? aiConfig.topCandidates : aiConfig.deepCandidates;
+    if (scored.length > maxBranches) scored = scored.slice(0, maxBranches);
 
     if (isMaximizing) {
       var best = -Infinity;
       for (var move of scored) {
         board[move.row][move.col] = AI_PLAYER;
-
-        // Quick win detection
         if (checkWin(move.row, move.col, AI_PLAYER)) {
           board[move.row][move.col] = 0;
           return 10000000 + depth;
         }
-
         var val = minimax(depth - 1, alpha, beta, false);
         board[move.row][move.col] = 0;
         if (val > best) best = val;
@@ -665,12 +664,10 @@
       var best = Infinity;
       for (var move of scored) {
         board[move.row][move.col] = HUMAN_PLAYER;
-
         if (checkWin(move.row, move.col, HUMAN_PLAYER)) {
           board[move.row][move.col] = 0;
           return -10000000 - depth;
         }
-
         var val = minimax(depth - 1, alpha, beta, true);
         board[move.row][move.col] = 0;
         if (val < best) best = val;
@@ -686,22 +683,14 @@
     if (moves.length === 0) return { row: 7, col: 7 };
     if (moves.length === 1) return moves[0];
 
-    // Score and order moves
-    var scored = [];
+    // Immediate win / must-block check
     for (var m of moves) {
       board[m.row][m.col] = AI_PLAYER;
-      if (checkWin(m.row, m.col, AI_PLAYER)) {
-        board[m.row][m.col] = 0;
-        return m; // Winning move
-      }
+      if (checkWin(m.row, m.col, AI_PLAYER)) { board[m.row][m.col] = 0; return m; }
       board[m.row][m.col] = 0;
 
-      // Also check if opponent would win here
       board[m.row][m.col] = HUMAN_PLAYER;
-      if (checkWin(m.row, m.col, HUMAN_PLAYER)) {
-        board[m.row][m.col] = 0;
-        return m; // Must block
-      }
+      if (checkWin(m.row, m.col, HUMAN_PLAYER)) { board[m.row][m.col] = 0; return m; }
       board[m.row][m.col] = 0;
     }
 
@@ -709,28 +698,44 @@
     var bestMove = moves[0];
     var alpha = -Infinity;
     var beta = Infinity;
+    var depth = aiConfig.depth;
 
     // Pre-score for ordering
     var preScored = [];
     for (var m of moves) {
       board[m.row][m.col] = AI_PLAYER;
-      var s = evaluateBoard();
+      preScored.push({ row: m.row, col: m.col, score: evaluateBoard() });
       board[m.row][m.col] = 0;
-      preScored.push({ row: m.row, col: m.col, score: s });
     }
     preScored.sort(function(a, b) { return b.score - a.score; });
-    if (preScored.length > 20) preScored = preScored.slice(0, 20);
+    var limit = aiConfig.topCandidates;
+    if (preScored.length > limit) preScored = preScored.slice(0, limit);
+
+    // Collect top moves for randomness (easy mode)
+    var topMoves = [];
+    var topThreshold = aiConfig.randomness ? 3 : 1;
 
     for (var move of preScored) {
       board[move.row][move.col] = AI_PLAYER;
-      var val = minimax(MAX_DEPTH - 1, alpha, beta, false);
+      var val = minimax(depth - 1, alpha, beta, false);
       board[move.row][move.col] = 0;
 
       if (val > bestScore) {
         bestScore = val;
         bestMove = { row: move.row, col: move.col };
+        topMoves = [{ row: move.row, col: move.col }];
+      } else if (aiConfig.randomness && val === bestScore) {
+        topMoves.push({ row: move.row, col: move.col });
+      } else if (aiConfig.randomness && val >= bestScore * 0.95) {
+        topMoves.push({ row: move.row, col: move.col });
       }
       if (val > alpha) alpha = val;
+    }
+
+    // In easy mode, pick randomly from top moves to add variety
+    if (aiConfig.randomness && topMoves.length > 1) {
+      var pick = topMoves[Math.floor(Math.random() * Math.min(topMoves.length, topThreshold))];
+      return pick;
     }
 
     return bestMove;
@@ -739,7 +744,11 @@
   // ── Game actions ──
   function showWinOverlay(winner) {
     winStone.className = 'win-stone ' + (winner === 1 ? 'black-stone' : 'white-stone');
-    winText.textContent = (winner === 1 ? '黑棋' : '白棋') + '获胜!';
+    var name = winner === 1 ? '黑棋' : '白棋';
+    if (gameMode === 'pvc') {
+      name = winner === HUMAN_PLAYER ? '你' : 'AI';
+    }
+    winText.textContent = name + '获胜!';
     winOverlay.classList.add('visible');
   }
 
@@ -749,7 +758,6 @@
 
   function undo() {
     if (gameOver || moveHistory.length === 0 || aiThinking) return;
-    // In PvC mode, undo two moves (player's + AI's)
     var count = gameMode === 'pvc' ? Math.min(2, moveHistory.length) : 1;
     for (var i = 0; i < count; i++) {
       if (moveHistory.length === 0) break;
@@ -780,20 +788,15 @@
     var pos = getIntersection(e);
     if (pos && board[pos.row][pos.col] === 0) {
       if (!hoverPos || hoverPos.row !== pos.row || hoverPos.col !== pos.col) {
-        hoverPos = pos;
-        drawBoard();
+        hoverPos = pos; drawBoard();
       }
-    } else if (hoverPos) {
-      hoverPos = null;
-      drawBoard();
-    }
+    } else if (hoverPos) { hoverPos = null; drawBoard(); }
   });
 
   canvas.addEventListener('mouseleave', function() {
     if (hoverPos) { hoverPos = null; drawBoard(); }
   });
 
-  // Touch
   canvas.addEventListener('touchstart', function(e) {
     if (gameOver || aiThinking) return;
     if (gameMode === 'pvc' && currentPlayer === AI_PLAYER) return;
@@ -806,18 +809,21 @@
   document.getElementById('btnReset').addEventListener('click', resetGame);
   document.getElementById('btnNewGame').addEventListener('click', resetGame);
 
-  // Mode buttons
-  document.querySelectorAll('.mode-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      setMode(this.dataset.mode);
-    });
-  });
+  // Mode toggle
+  var modeBtns = document.querySelectorAll('#modeToggle .seg-btn');
+  for (var i = 0; i < modeBtns.length; i++) {
+    modeBtns[i].addEventListener('click', function() { setMode(this.dataset.mode); });
+  }
 
-  // Keyboard
+  // Difficulty toggle
+  var diffBtns = document.querySelectorAll('#difficultyToggle .seg-btn');
+  for (var i = 0; i < diffBtns.length; i++) {
+    diffBtns[i].addEventListener('click', function() { setDifficulty(this.dataset.diff); });
+  }
+
   document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-      e.preventDefault();
-      undo();
+      e.preventDefault(); undo();
     }
   });
 
