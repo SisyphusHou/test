@@ -204,6 +204,8 @@
   }
   .btn-primary:active { transform: scale(0.97); }
 
+  #difficultyToggle.hidden { display: none; }
+
   @media (max-width: 640px) {
     .controls-row { flex-direction: column; gap: 8px; }
     .info-panel { flex-direction: column; align-items: flex-start; gap: 12px; padding: 12px 18px; }
@@ -218,7 +220,7 @@
       <button class="seg-btn active" data-mode="pvp">人人对战</button>
       <button class="seg-btn" data-mode="pvc">人机对战</button>
     </div>
-    <div class="segmented-control" id="difficultyToggle">
+    <div class="segmented-control hidden" id="difficultyToggle">
       <button class="seg-btn" data-diff="easy">简单</button>
       <button class="seg-btn active" data-diff="normal">一般</button>
       <button class="seg-btn" data-diff="hard">困难</button>
@@ -352,6 +354,12 @@
 
   function setMode(mode) {
     gameMode = mode;
+    var diffToggle = document.getElementById('difficultyToggle');
+    if (mode === 'pvc') {
+      diffToggle.classList.remove('hidden');
+    } else {
+      diffToggle.classList.add('hidden');
+    }
     var btns = document.querySelectorAll('#modeToggle .seg-btn');
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].dataset.mode === mode);
