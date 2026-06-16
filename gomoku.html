@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋</title>
+<style>
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #1a1a2e;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .info-panel {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: #16213e;
+    border-radius: 12px;
+    padding: 14px 28px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .turn-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #e0e0e0;
+    font-size: 15px;
+    font-weight: 500;
+    min-width: 110px;
+  }
+
+  .turn-stone {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .turn-stone.black-stone {
+    background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+  }
+
+  .turn-stone.white-stone {
+    background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+  }
+
+  .score {
+    display: flex;
+    gap: 18px;
+  }
+
+  .score-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #a0a0b0;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .score-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .score-dot.black-dot {
+    background: radial-gradient(circle at 35% 35%, #555, #111 55%, #000 80%);
+  }
+
+  .score-dot.white-dot {
+    background: radial-gradient(circle at 35% 35%, #fff, #e8e8e8 50%, #ccc 80%);
+  }
+
+  .score-value {
+    color: #e0e0e0;
+    font-weight: 600;
+    margin-left: 2px;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 14px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #c0c0d0;
+    background: rgba(255,255,255,0.05);
+    transition: all 0.15s;
+    outline: none;
+  }
+
+  .btn:hover {
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.20);
+    color: #e0e0e0;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+
+  .board-wrapper {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  canvas {
+    display: block;
+    cursor: pointer;
+  }
+
+  canvas.game-over {
+    cursor: default;
+  }
+
+  .win-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+  }
+
+  .win-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .win-card {
+    background: #1e1e3a;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 16px;
+    padding: 32px 40px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .win-text {
+    font-size: 22px;
+    font-weight: 600;
+    color: #e0e0e0;
+  }
+
+  .win-stone {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+
+  .btn-primary {
+    padding: 10px 28px;
+    font-size: 15px;
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.20);
+    border-radius: 10px;
+    color: #e0e0e0;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.15s;
+    outline: none;
+  }
+
+  .btn-primary:hover {
+    background: rgba(255,255,255,0.16);
+    border-color: rgba(255,255,255,0.30);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.97);
+  }
+
+  .last-move-dot {
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="info-panel">
+    <div class="turn-indicator">
+      <div class="turn-stone black-stone" id="turnStone"></div>
+      <span id="turnText">黑棋</span>
+    </div>
+
+    <div class="score">
+      <div class="score-item">
+        <div class="score-dot black-dot"></div>
+        <span>黑棋</span>
+        <span class="score-value" id="scoreBlack">0</span>
+      </div>
+      <div class="score-item">
+        <div class="score-dot white-dot"></div>
+        <span>白棋</span>
+        <span class="score-value" id="scoreWhite">0</span>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn" id="btnUndo" title="悔棋">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+        <span>悔棋</span>
+      </button>
+      <button class="btn" id="btnReset" title="重新开始">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+        <span>重新开始</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="board-wrapper">
+    <canvas id="board"></canvas>
+    <div class="win-overlay" id="winOverlay">
+      <div class="win-card">
+        <div class="win-stone" id="winStone"></div>
+        <div class="win-text" id="winText"></div>
+        <button class="btn-primary" id="btnNewGame">再来一局</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const BOARD_SIZE = 15;
+  const MARGIN = 32;
+  const CELL_SIZE = 36;
+  const STONE_RADIUS = CELL_SIZE * 0.44;
+  const CANVAS_SIZE = MARGIN * 2 + CELL_SIZE * (BOARD_SIZE - 1);
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  canvas.width = CANVAS_SIZE;
+  canvas.height = CANVAS_SIZE;
+
+  const turnStone = document.getElementById('turnStone');
+  const turnText = document.getElementById('turnText');
+  const scoreBlack = document.getElementById('scoreBlack');
+  const scoreWhite = document.getElementById('scoreWhite');
+  const winOverlay = document.getElementById('winOverlay');
+  const winStone = document.getElementById('winStone');
+  const winText = document.getElementById('winText');
+
+  let board = [];
+  let moveHistory = [];
+  let currentPlayer = 1;
+  let gameOver = false;
+  let winLine = null;
+  let wins = { 1: 0, 2: 0 };
+  let hoverPos = null;
+
+  function initBoard() {
+    board = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(0));
+    moveHistory = [];
+    currentPlayer = 1;
+    gameOver = false;
+    winLine = null;
+    hoverPos = null;
+    updateUI();
+    drawBoard();
+  }
+
+  function updateUI() {
+    if (gameOver) {
+      var winner = currentPlayer === 1 ? 2 : 1;
+      turnStone.className = 'turn-stone ' + (winner === 1 ? 'black-stone' : 'white-stone');
+      turnText.textContent = (winner === 1 ? '黑棋' : '白棋') + ' 胜!';
+    } else {
+      turnStone.className = 'turn-stone ' + (currentPlayer === 1 ? 'black-stone' : 'white-stone');
+      turnText.textContent = currentPlayer === 1 ? '黑棋落子' : '白棋落子';
+    }
+    scoreBlack.textContent = wins[1];
+    scoreWhite.textContent = wins[2];
+    if (gameOver) {
+      canvas.classList.add('game-over');
+    } else {
+      canvas.classList.remove('game-over');
+    }
+  }
+
+  function drawBoard() {
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Board background
+    var gradient = ctx.createLinearGradient(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    gradient.addColorStop(0, '#deb887');
+    gradient.addColorStop(0.5, '#d2a66e');
+    gradient.addColorStop(1, '#c49a5a');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < BOARD_SIZE; i++) {
+      var pos = MARGIN + i * CELL_SIZE;
+      ctx.beginPath();
+      ctx.moveTo(MARGIN, pos);
+      ctx.lineTo(MARGIN + CELL_SIZE * (BOARD_SIZE - 1), pos);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(pos, MARGIN);
+      ctx.lineTo(pos, MARGIN + CELL_SIZE * (BOARD_SIZE - 1));
+      ctx.stroke();
+    }
+
+    // Star points (天元 and corners)
+    var starPoints = [
+      [3, 3], [3, 7], [3, 11],
+      [7, 3], [7, 7], [7, 11],
+      [11, 3], [11, 7], [11, 11]
+    ];
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (var [r, c] of starPoints) {
+      var cx = MARGIN + c * CELL_SIZE;
+      var cy = MARGIN + r * CELL_SIZE;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw stones
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (board[r][c] !== 0) {
+          drawStone(r, c, board[r][c]);
+        }
+      }
+    }
+
+    // Highlight winning stones
+    if (winLine) {
+      for (var [wr, wc] of winLine) {
+        var wx = MARGIN + wc * CELL_SIZE;
+        var wy = MARGIN + wr * CELL_SIZE;
+        ctx.strokeStyle = 'rgba(255, 215, 0, 0.9)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(wx, wy, STONE_RADIUS + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+
+    // Last move indicator
+    if (moveHistory.length > 0) {
+      var last = moveHistory[moveHistory.length - 1];
+      var lx = MARGIN + last.col * CELL_SIZE;
+      var ly = MARGIN + last.row * CELL_SIZE;
+      ctx.fillStyle = last.player === 1 ? '#ff4d4d' : '#ff4d4d';
+      ctx.beginPath();
+      ctx.arc(lx, ly, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Hover preview
+    if (hoverPos && !gameOver && board[hoverPos.row][hoverPos.col] === 0) {
+      var hx = MARGIN + hoverPos.col * CELL_SIZE;
+      var hy = MARGIN + hoverPos.row * CELL_SIZE;
+      ctx.fillStyle = currentPlayer === 1 ? 'rgba(0,0,0,0.25)' : 'rgba(200,200,200,0.40)';
+      ctx.beginPath();
+      ctx.arc(hx, hy, STONE_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawStone(row, col, player) {
+    var x = MARGIN + col * CELL_SIZE;
+    var y = MARGIN + row * CELL_SIZE;
+    var r = STONE_RADIUS;
+
+    ctx.save();
+
+    // Shadow
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 1.5;
+    ctx.shadowOffsetY = 1.5;
+
+    if (player === 1) {
+      var grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
+      grad.addColorStop(0, '#555');
+      grad.addColorStop(0.6, '#1a1a1a');
+      grad.addColorStop(1, '#000');
+      ctx.fillStyle = grad;
+    } else {
+      var grad = ctx.createRadialGradient(x - r * 0.3, y - r * 0.35, r * 0.1, x, y, r);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.5, '#e8e8e8');
+      grad.addColorStop(1, '#bbb');
+      ctx.fillStyle = grad;
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function getIntersection(e) {
+    var rect = canvas.getBoundingClientRect();
+    var scaleX = CANVAS_SIZE / rect.width;
+    var scaleY = CANVAS_SIZE / rect.height;
+    var mx = (e.clientX - rect.left) * scaleX;
+    var my = (e.clientY - rect.top) * scaleY;
+
+    var col = Math.round((mx - MARGIN) / CELL_SIZE);
+    var row = Math.round((my - MARGIN) / CELL_SIZE);
+
+    if (col < 0 || col >= BOARD_SIZE || row < 0 || row >= BOARD_SIZE) return null;
+
+    var cx = MARGIN + col * CELL_SIZE;
+    var cy = MARGIN + row * CELL_SIZE;
+    var dist = Math.sqrt((mx - cx) ** 2 + (my - cy) ** 2);
+
+    if (dist > STONE_RADIUS + 2) return null;
+    return { row, col };
+  }
+
+  function checkWin(row, col, player) {
+    var directions = [
+      [0, 1],
+      [1, 0],
+      [1, 1],
+      [1, -1]
+    ];
+
+    for (var [dr, dc] of directions) {
+      var line = [[row, col]];
+      // Positive direction
+      for (let i = 1; i < 5; i++) {
+        var r = row + dr * i;
+        var c = col + dc * i;
+        if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
+          line.push([r, c]);
+        } else break;
+      }
+      // Negative direction
+      for (let i = 1; i < 5; i++) {
+        var r = row - dr * i;
+        var c = col - dc * i;
+        if (r >= 0 && r < BOARD_SIZE && c >= 0 && c < BOARD_SIZE && board[r][c] === player) {
+          line.unshift([r, c]);
+        } else break;
+      }
+
+      if (line.length >= 5) {
+        winLine = line;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function placeStone(row, col) {
+    if (gameOver || board[row][col] !== 0) return;
+
+    board[row][col] = currentPlayer;
+    moveHistory.push({ row, col, player: currentPlayer });
+
+    if (checkWin(row, col, currentPlayer)) {
+      gameOver = true;
+      wins[currentPlayer]++;
+      updateUI();
+      drawBoard();
+      showWinOverlay(currentPlayer);
+      return;
+    }
+
+    currentPlayer = currentPlayer === 1 ? 2 : 1;
+    updateUI();
+    drawBoard();
+  }
+
+  function showWinOverlay(winner) {
+    winStone.className = 'win-stone ' + (winner === 1 ? 'black-stone' : 'white-stone');
+    winText.textContent = (winner === 1 ? '黑棋' : '白棋') + '获胜!';
+    winOverlay.classList.add('visible');
+  }
+
+  function hideWinOverlay() {
+    winOverlay.classList.remove('visible');
+  }
+
+  function undo() {
+    if (gameOver || moveHistory.length === 0) return;
+    var move = moveHistory.pop();
+    board[move.row][move.col] = 0;
+    currentPlayer = move.player;
+    winLine = null;
+    updateUI();
+    drawBoard();
+  }
+
+  function resetGame() {
+    hideWinOverlay();
+    initBoard();
+  }
+
+  // Event listeners
+  canvas.addEventListener('click', function(e) {
+    var pos = getIntersection(e);
+    if (pos) {
+      placeStone(pos.row, pos.col);
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    var pos = getIntersection(e);
+    if (pos && board[pos.row][pos.col] === 0 && !gameOver) {
+      if (!hoverPos || hoverPos.row !== pos.row || hoverPos.col !== pos.col) {
+        hoverPos = pos;
+        drawBoard();
+      }
+    } else if (hoverPos) {
+      hoverPos = null;
+      drawBoard();
+    }
+  });
+
+  canvas.addEventListener('mouseleave', function() {
+    if (hoverPos) {
+      hoverPos = null;
+      drawBoard();
+    }
+  });
+
+  document.getElementById('btnUndo').addEventListener('click', undo);
+  document.getElementById('btnReset').addEventListener('click', resetGame);
+  document.getElementById('btnNewGame').addEventListener('click', resetGame);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault();
+      undo();
+    }
+  });
+
+  // Touch support
+  canvas.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    var touch = e.touches[0];
+    var pos = getIntersection(touch);
+    if (pos) {
+      placeStone(pos.row, pos.col);
+    }
+  }, { passive: false });
+
+  initBoard();
+})();
+</script>
+</body>
+</html>
